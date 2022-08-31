@@ -30,6 +30,17 @@ CORS(app)
 '''
 
 
+@app.route("/drinks")
+def get_drinks():
+    drinks = [drink.short() for drink in Drink.query.order_by(Drink.title).all()]
+    if len(drinks) == 0:
+        abort(404)
+    return jsonify({
+        "success": True,
+        "drinks": drinks
+    })
+
+
 '''
 @TODO implement endpoint
     GET /drinks-detail
@@ -38,6 +49,17 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
         or appropriate status code indicating reason for failure
 '''
+
+
+@app.route("/drinks-detail")
+def get_drinks_detail():
+    drinks = [drink.long() for drink in Drink.query.order_by(Drink.title).all()]
+    if len(drinks) == 0:
+        abort(404)
+    return jsonify({
+        "success": True,
+        "drinks": drinks
+    })
 
 
 '''
@@ -49,6 +71,26 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the newly created drink
         or appropriate status code indicating reason for failure
 '''
+
+
+@app.route("/drinks", methods=["POST"])
+def create_drink():
+    body = request.get_json()
+    title = body.get("title", None)
+    recipe = body.get("recipe", None)
+    if not (title and recipe ):
+        abort(400)
+    try:
+        recipe = json.dumps(recipe)
+        drink = Drink(title=title, recipe=recipe)
+        drink.insert();
+        return jsonify({
+            "success": True,
+            "drinks": [drink.long()]
+        })
+    except Exception as ex:
+        print(ex)
+        abort(422)
 
 
 '''
@@ -63,7 +105,6 @@ CORS(app)
         or appropriate status code indicating reason for failure
 '''
 
-
 '''
 @TODO implement endpoint
     DELETE /drinks/<id>
@@ -74,7 +115,6 @@ CORS(app)
     returns status code 200 and json {"success": True, "delete": id} where id is the id of the deleted record
         or appropriate status code indicating reason for failure
 '''
-
 
 # Error Handling
 '''
@@ -107,8 +147,11 @@ def unprocessable(error):
     error handler should conform to general task above
 '''
 
-
 '''
 @TODO implement error handler for AuthError
     error handler should conform to general task above
 '''
+
+# Default port:
+if __name__ == '__main__':
+    app.run()
