@@ -141,6 +141,23 @@ def update_drink(drink_id):
         or appropriate status code indicating reason for failure
 '''
 
+
+@app.route("/drinks/<int:drink_id>", methods=["DELETE"])
+def delete_drink(drink_id):
+    drink = Drink.query.filter_by(id=drink_id).one_or_none()
+    if not drink:
+        abort(404)
+    try:
+        drink.delete()
+        return jsonify({
+            "success": True,
+            "delete": drink_id
+        })
+    except Exception as ex:
+        print(ex)
+        abort(422)
+
+
 # Error Handling
 '''
 Example error handling for unprocessable entity
@@ -154,6 +171,15 @@ def unprocessable(error):
         "error": 422,
         "message": "unprocessable"
     }), 422
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        "success": False,
+        "error": 404,
+        "message": "not found"
+    }), 404
 
 
 '''
