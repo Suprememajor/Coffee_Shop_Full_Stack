@@ -50,6 +50,19 @@ a persistent drink entity, extends the base SQLAlchemy Model
 '''
 
 
+class User(db.Model):
+    id = Column(Integer().with_variant(Integer, "sqlite"), primary_key=True)
+    username = Column(String(80), unique=True)
+    password = Column(String(180), nullable=False)
+
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+
+    def __repr__(self):
+        return self.username + ": " + self.password
+
+
 class Drink(db.Model):
     # Autoincrementing, unique primary key
     id = Column(Integer().with_variant(Integer, "sqlite"), primary_key=True)
