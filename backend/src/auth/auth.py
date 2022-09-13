@@ -80,7 +80,11 @@ def get_token_auth_header():
 
 
 def check_permissions(permission, payload):
-    raise Exception('Not Implemented')
+    if permission not in payload['permissions']:
+        raise AuthError({
+            'code': 'Forbidden',
+            'description': 'Unauthorized access.'
+        }, 403)
 
 
 '''
