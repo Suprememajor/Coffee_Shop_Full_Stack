@@ -3,9 +3,6 @@ from flask import Flask, request, jsonify, abort
 from sqlalchemy import exc
 import json
 from flask_cors import CORS
-from urllib.request import urlopen
-from jose import jwt
-from functools import wraps
 
 from .database.models import db_drop_and_create_all, setup_db, Drink
 from .auth.auth import AuthError, requires_auth
@@ -14,83 +11,7 @@ app = Flask(__name__)
 setup_db(app)
 CORS(app)
 
-AUTH0_DOMAIN = 'dev-g310bp-8.us.auth0.com'
-ALGORITHMS = ['RS256']
-API_AUDIENCE = 'http://www.coffee-shop-api.com'
 
-
-class AuthError(Exception):
-    def __init__(self, error, status_code):
-        self.error = error
-        self.status_code = status_code
-
-
-def verify_decode_jwt(token):
-    # print("token: " + token)
-    jsonurl = urlopen(f'https://{AUTH0_DOMAIN}/.well-known/jwks.json')
-    jwks = json.loads(jsonurl.read())
-    unverified_header = jwt.get_unverified_header(token)
-    rsa_key = {}
-    if 'kid' not in unverified_header:
-        raise AuthError({
-            'code': 'invalid_header',
-            'description': 'Authorization malformed.'
-        }, 401)
-
-    for key in jwks['keys']:
-        if key['kid'] == unverified_header['kid']:
-            rsa_key = {
-                'kty': key['kty'],
-                'kid': key['kid'],
-                'use': key['use'],
-                'n': key['n'],
-                'e': key['e']
-            }
-    if rsa_key:
-        try:
-            payload = jwt.decode(
-                token,
-                rsa_key,
-                algorithms=ALGORITHMS,
-                audience=API_AUDIENCE,
-                issuer='https://' + AUTH0_DOMAIN + '/'
-            )
-            return payload
-
-        except jwt.ExpiredSignatureError as e:
-            raise AuthError({
-                'code': 'token_expired',
-                'description': 'Token expired.'
-            }, 401)
-
-        except jwt.JWTClaimsError as e:
-            raise AuthError({
-                'code': 'invalid_claims',
-                'description': 'Incorrect claims. Please, check the audience and issuer.'
-            }, 401)
-        except Exception as e:
-            raise AuthError({
-                'code': 'invalid_header',
-                'description': 'Unable to parse authentication token.'
-            }, 400)
-    raise AuthError({
-                'code': 'invalid_header',
-                'description': 'Unable to find the appropriate key.'
-            }, 400)
-
-
-def requires_auth(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        token = get_token_auth_header()
-        # print("wrapper token: " + token)
-        try:
-            payload = verify_decode_jwt(token)
-        except Exception:
-            abort(401)
-        return f(payload, *args, **kwargs)
-
-    return wrapper
 
 '''
 @TODO uncomment the following line to initialize the datbase
@@ -112,7 +33,7 @@ def requires_auth(f):
 
 
 @app.route("/drinks")
-def get_drinks(new_dict):
+def get_drinks():
     drinks = [drink.short() for drink in Drink.query.order_by(Drink.title).all()]
     if len(drinks) == 0:
         abort(404)
@@ -133,18 +54,15 @@ def get_drinks(new_dict):
 
 
 @app.route("/drinks-detail")
-@requires_auth
-def get_drinks_detail(user):
-    if 'get:drinks-detail' in user['permissions']:
-        drinks = [drink.long() for drink in Drink.query.order_by(Drink.title).all()]
-        if len(drinks) == 0:
-            abort(404)
-        return jsonify({
-            "success": True,
-            "drinks": drinks
-        })
-    else:
-        abort(403)
+@requires_auth(permission='get:drinks-detail')
+def get_drinks_detail():
+    drinks = [drink.long() for drink in Drink.query.order_by(Drink.title).all()]
+    if len(drinks) == 0:
+        abort(404)
+    return jsonify({
+        "success": True,
+        "drinks": drinks
+    })
 
 
 '''
@@ -159,26 +77,24 @@ def get_drinks_detail(user):
 
 
 @app.route("/drinks", methods=["POST"])
-def create_drink(user):
-    if 'post:drinks' in user['permissions']:
-        body = request.get_json()
-        title = body.get("title", None)
-        recipe = body.get("recipe", None)
-        if not (title and recipe):
-            abort(400)
-        try:
-            recipe = json.dumps(recipe)
-            drink = Drink(title=title, recipe=recipe)
-            drink.insert();
-            return jsonify({
-                "success": True,
-                "drinks": [drink.long()]
-            })
-        except Exception as ex:
-            print(ex)
-            abort(422)
-    else:
-        abort(403)
+@requires_auth(permission='post:drinks')
+def create_drink():
+    body = request.get_json()
+    title = body.get("title", None)
+    recipe = body.get("recipe", None)
+    if not (title and recipe):
+        abort(400)
+    try:
+        recipe = json.dumps(recipe)
+        drink = Drink(title=title, recipe=recipe)
+        drink.insert();
+        return jsonify({
+            "success": True,
+            "drinks": [drink.long()]
+        })
+    except Exception as ex:
+        print(ex)
+        abort(422)
 
 
 '''
@@ -195,30 +111,28 @@ def create_drink(user):
 
 
 @app.route("/drinks/<int:drink_id>", methods=["PATCH"])
-def update_drink(user, drink_id):
-    if 'patch:drinks' in user['permissions']:
-        drink = Drink.query.filter_by(id=drink_id).one_or_none()
-        if not drink:
-            abort(404)
-        body = request.get_json()
-        title = body.get("title", None)
-        recipe = body.get("recipe", None)
-        try:
-            if title:
-                drink.title = title
-            if recipe:
-                recipe = json.dumps(recipe)
-                drink.recipe = recipe
-            drink.update()
-            return jsonify({
-                "success": True,
-                "drinks": [drink.long()]
-            })
-        except Exception as ex:
-            print(ex)
-            abort(422)
-    else:
-        abort(403)
+@requires_auth(permission='patch:drinks')
+def update_drink(drink_id):
+    drink = Drink.query.filter_by(id=drink_id).one_or_none()
+    if not drink:
+        abort(404)
+    body = request.get_json()
+    title = body.get("title", None)
+    recipe = body.get("recipe", None)
+    try:
+        if title:
+            drink.title = title
+        if recipe:
+            recipe = json.dumps(recipe)
+            drink.recipe = recipe
+        drink.update()
+        return jsonify({
+            "success": True,
+            "drinks": [drink.long()]
+        })
+    except Exception as ex:
+        print(ex)
+        abort(422)
 
 
 '''
@@ -234,8 +148,8 @@ def update_drink(user, drink_id):
 
 
 @app.route("/drinks/<int:drink_id>", methods=["DELETE"])
+@requires_auth(permission='get:drinks-detail')
 def delete_drink(drink_id):
-    if 'get:drinks-detail' in user['permissions']:
     drink = Drink.query.filter_by(id=drink_id).one_or_none()
     if not drink:
         abort(404)

@@ -1,7 +1,7 @@
 import json
 from flask import request, _request_ctx_stack
 from functools import wraps
-import jwt
+from jose import jwt
 from urllib.request import urlopen
 
 AUTH0_DOMAIN = 'dev-g310bp-8.us.auth0.com'
@@ -174,7 +174,7 @@ def requires_auth(permission=''):
             token = get_token_auth_header()
             payload = verify_decode_jwt(token)
             check_permissions(permission, payload)
-            return f(payload, *args, **kwargs)
+            return f(*args, **kwargs)
 
         return wrapper
 
